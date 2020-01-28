@@ -130,7 +130,7 @@ def test_all_builtin_models_default_constructible() -> None:
     for cls in Model.all_models():
         try:
             cls()
-        except:
+        except Exception:
             bad.append(cls.__qualified__)
         assert bad == []
 
