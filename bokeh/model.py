@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 # Standard library imports
 from json import loads
 from operator import itemgetter
-from typing import ClassVar, Dict, List, Optional, Type
+from typing import ClassVar, Dict, List, Optional, Type, Union
 
 # Bokeh imports
 from .core.has_props import HasProps, abstract
@@ -31,6 +31,7 @@ from .events import Event
 from .resources import artifacts
 from .themes import default as default_theme
 from .util.callback_manager import EventCallbackManager, PropertyCallbackManager
+from .util.compiler import Implementation
 from .util.serialization import make_id
 
 #-----------------------------------------------------------------------------
@@ -189,10 +190,10 @@ class Model(HasProps, PropertyCallbackManager, EventCallbackManager):
     def all_models(cls) -> List[Type["Model"]]:
         return list(_known_models.values())
 
-    __implementation__: ClassVar[Optional[str]] = None
+    __implementation__: ClassVar[Optional[Union[str, Implementation]]] = None
 
     @classmethod
-    def is_extension(cls):
+    def is_extension(cls) -> bool:
         return cls.__implementation__ is not None
 
     @classmethod
