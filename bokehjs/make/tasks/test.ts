@@ -142,6 +142,11 @@ function server(): Promise<ChildProcess> {
       else
         reject(new BuildError("devtools-server", "failed to start"))
     })
+    proc.on("exit", (code, _signal) => {
+      if (code !== 0) {
+        reject(new BuildError("devtools-server", `failed to start`))
+      }
+    })
   })
 }
 
