@@ -118,8 +118,10 @@ async function headless(): Promise<ChildProcess> {
   })
 }
 
+const port = 5778
+
 function server(): Promise<ChildProcess> {
-  const args = ["--no-warnings", "./test/devtools", "server"]
+  const args = ["--no-warnings", "./test/devtools", "server", `--port=${port}`]
 
   if (argv.debug) {
     if (argv.debug === true)
@@ -155,7 +157,7 @@ function opt(name: string, value: unknown): string {
 }
 
 function devtools(name: string): Promise<void> {
-  const args = ["--no-warnings", "./test/devtools", `http://localhost:5777/${name}`, opt("k", argv.k), opt("grep", argv.grep)]
+  const args = ["--no-warnings", "./test/devtools", `http://localhost:${port}/${name}`, opt("k", argv.k), opt("grep", argv.grep)]
 
   if (argv.debug) {
     if (argv.debug === true)
