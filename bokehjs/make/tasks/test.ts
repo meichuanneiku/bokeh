@@ -202,6 +202,8 @@ task("test:compile", ["defaults:generate"], async () => {
 
 task("test:bundle", ["test:unit:bundle", "test:integration:bundle"])
 
+task("test:build", ["test:bundle"])
+
 task("test:unit:bundle", ["test:compile"], async () => {
   bundle("unit")
 })
