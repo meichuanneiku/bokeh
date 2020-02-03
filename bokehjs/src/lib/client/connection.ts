@@ -33,7 +33,7 @@ export class ClientConnection {
               protected _on_have_session_hook: ((session: ClientSession) => void) | null = null,
               protected _on_closed_permanently_hook: (() => void) | null = null) {
 
-    this.id = JSON.parse(atob(token.split('.')[0]))['session_id'].split('.')[0]
+    this.id = JSON.parse(atob(token.split('.')[0])).session_id.split('.')[0]
     logger.debug(`Creating websocket ${this._number} to '${this.url}' session '${this.id}'`)
   }
 
@@ -47,7 +47,7 @@ export class ClientConnection {
     this._current_handler = null
 
     try {
-      let token = `${this.token}`
+      const token = `${this.token}`
       let versioned_url = `${this.url}`
       if (this.args_string != null && this.args_string.length > 0)
         versioned_url += `&${this.args_string}`
