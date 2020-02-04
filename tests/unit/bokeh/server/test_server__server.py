@@ -37,7 +37,7 @@ from bokeh.core.properties import List, String
 from bokeh.model import Model
 from bokeh.server.server import BaseServer, Server
 from bokeh.server.tornado import BokehTornado
-from bokeh.util.session_id import check_token_signature
+from bokeh.util.session_id import check_token_signature, generate_jwt_token, get_session_id
 
 # Module under test
 import bokeh.server.server as server # isort:skip
@@ -224,12 +224,12 @@ async def test_get_sessions(ManagedServerLoop) -> None:
 # examples:
 # "sessionid" : "NzlNoPfEYJahnPljE34xI0a5RSTaU1Aq1Cx5"
 # 'sessionid':'NzlNoPfEYJahnPljE34xI0a5RSTaU1Aq1Cx5'
-sessionid_in_json = re.compile("""["']sessionid["'] *: *["']([^"]+)["']""")
-def extract_sessionid_from_json(html):
+token_in_json = re.compile("""["']token["'] *: *["']([^"]+)["']""")
+def extract_token_from_json(html):
     if not isinstance(html, str):
         import codecs
         html = codecs.decode(html, 'utf-8')
-    match = sessionid_in_json.search(html)
+    match = token_in_json.search(html)
     return match.group(1)
 
 # examples:
@@ -400,8 +400,8 @@ async def test__request_in_session_context(ManagedServerLoop) -> None:
     with ManagedServerLoop(application) as server:
         response = await http_get(server.io_loop, url(server) + "?foo=10")
         html = response.body
-        print(html)
-        sessionid = extract_sessionid_from_json(html)
+        token = extract_token_from_json(html)
+        sessionid = get_session_id(token)
 
         server_session = server.get_session('/', sessionid)
         server_doc = server_session.document
@@ -416,7 +416,8 @@ async def test__request_in_session_context_has_arguments(ManagedServerLoop) -> N
     with ManagedServerLoop(application) as server:
         response = await http_get(server.io_loop, url(server) + "?foo=10")
         html = response.body
-        sessionid = extract_sessionid_from_json(html)
+        token = extract_token_from_json(html)
+        sessionid = get_session_id(token)
 
         server_session = server.get_session('/', sessionid)
         server_doc = server_session.document
@@ -431,7 +432,8 @@ async def test__no_request_arguments_in_session_context(ManagedServerLoop) -> No
     with ManagedServerLoop(application) as server:
         response = await http_get(server.io_loop, url(server))
         html = response.body
-        sessionid = extract_sessionid_from_json(html)
+        token = extract_token_from_json(html)
+        sessionid = get_session_id(token)
 
         server_session = server.get_session('/', sessionid)
         server_doc = server_session.document
@@ -469,7 +471,8 @@ async def test__autocreate_session_autoload(ManagedServerLoop) -> None:
 
         response = await http_get(server.io_loop, autoload_url(server))
         js = response.body
-        sessionid = extract_sessionid_from_json(js)
+        token = extract_token_from_json(js)
+        sessionid = get_session_id(token)
 
         sessions = server.get_sessions('/')
         assert 1 == len(sessions)
@@ -498,7 +501,8 @@ async def test__autocreate_session_doc(ManagedServerLoop) -> None:
 
         response = await http_get(server.io_loop, url(server))
         html = response.body
-        sessionid = extract_sessionid_from_json(html)
+        token = extract_token_from_json(html)
+        sessionid = get_session_id(token)
 
         sessions = server.get_sessions('/')
         assert 1 == len(sessions)
@@ -512,7 +516,8 @@ async def test__no_autocreate_session_websocket(ManagedServerLoop) -> None:
         sessions = server.get_sessions('/')
         assert 0 == len(sessions)
 
-        await websocket_open(server.io_loop, ws_url(server))
+        token = generate_jwt_token("")
+        await websocket_open(server.io_loop, ws_url(server), subprotocols=["bokeh", token])
 
         sessions = server.get_sessions('/')
         assert 0 == len(sessions)
@@ -528,7 +533,8 @@ async def test__use_provided_session_autoload(ManagedServerLoop) -> None:
         expected = 'foo'
         response = await http_get(server.io_loop, autoload_url(server) + "&bokeh-session-id=" + expected)
         js = response.body
-        sessionid = extract_sessionid_from_json(js)
+        token = extract_token_from_json(js)
+        sessionid = get_session_id(token)
         assert expected == sessionid
 
         sessions = server.get_sessions('/')
@@ -546,7 +552,8 @@ async def test__use_provided_session_doc(ManagedServerLoop) -> None:
         expected = 'foo'
         response = await http_get(server.io_loop, url(server) + "?bokeh-session-id=" + expected)
         html = response.body
-        sessionid = extract_sessionid_from_json(html)
+        token = extract_token_from_json(html)
+        sessionid = get_session_id(token)
         assert expected == sessionid
 
         sessions = server.get_sessions('/')
@@ -562,8 +569,8 @@ async def test__use_provided_session_websocket(ManagedServerLoop) -> None:
         assert 0 == len(sessions)
 
         expected = 'foo'
-        url = ws_url(server) + "?bokeh-session-id=" + expected
-        await websocket_open(server.io_loop, url)
+        token = generate_jwt_token(expected)
+        await websocket_open(server.io_loop, ws_url(server), subprotocols=["bokeh", token])
 
         sessions = server.get_sessions('/')
         assert 1 == len(sessions)
@@ -579,13 +586,14 @@ async def test__autocreate_signed_session_autoload(ManagedServerLoop) -> None:
 
         response = await http_get(server.io_loop, autoload_url(server))
         js = response.body
-        sessionid = extract_sessionid_from_json(js)
+        token = extract_token_from_json(js)
+        sessionid = get_session_id(token)
 
         sessions = server.get_sessions('/')
         assert 1 == len(sessions)
         assert sessionid == sessions[0].id
 
-        assert check_session_id_signature(sessionid, signed=True, secret_key='foo')
+        assert check_token_signature(token, signed=True, secret_key='foo')
 
 @pytest.mark.asyncio
 @pytest.mark.unit
@@ -597,13 +605,14 @@ async def test__autocreate_signed_session_doc(ManagedServerLoop) -> None:
 
         response = await http_get(server.io_loop, url(server))
         html = response.body
-        sessionid = extract_sessionid_from_json(html)
+        token = extract_token_from_json(html)
+        sessionid = get_session_id(token)
 
         sessions = server.get_sessions('/')
         assert 1 == len(sessions)
         assert sessionid == sessions[0].id
 
-        assert check_session_id_signature(sessionid, signed=True, secret_key='foo')
+        assert check_token_signature(token, signed=True, secret_key='foo')
 
 @pytest.mark.asyncio
 @pytest.mark.unit
@@ -646,11 +655,12 @@ async def test__reject_unsigned_session_websocket(ManagedServerLoop) -> None:
         assert 0 == len(sessions)
 
         expected = 'foo'
-        url = ws_url(server) + "?bokeh-session-id=" + expected
-        await websocket_open(server.io_loop, url)
+        token = generate_jwt_token(expected)
+        await websocket_open(server.io_loop, ws_url(server), subprotocols=["bokeh", token])
 
         sessions = server.get_sessions('/')
         assert 0 == len(sessions)
+
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test__no_generate_session_autoload(ManagedServerLoop) -> None:
