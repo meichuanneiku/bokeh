@@ -11,6 +11,16 @@ let _connection_count: number = 0
 
 export type Rejecter = (error: Error | string) => void
 
+export type Token = {
+  session_expiry: number
+  session_id: string
+  [key: string]: unknown
+}
+
+export function parse_token(token: string): Token {
+  return JSON.parse(atob(token.split('.')[0]))
+}
+
 export class ClientConnection {
 
   protected readonly _number = _connection_count++
@@ -33,7 +43,7 @@ export class ClientConnection {
               protected _on_have_session_hook: ((session: ClientSession) => void) | null = null,
               protected _on_closed_permanently_hook: (() => void) | null = null) {
 
-    this.id = JSON.parse(atob(token.split('.')[0])).session_id.split('.')[0]
+    this.id = parse_token(token).session_id.split('.')[0]
     logger.debug(`Creating websocket ${this._number} to '${this.url}' session '${this.id}'`)
   }
 
